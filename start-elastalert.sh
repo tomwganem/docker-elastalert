@@ -1,29 +1,32 @@
-#!/bin/sh
-
-set -e
+#!/bin/bash -e
 
 # Set the timezone.
 if [ "$SET_CONTAINER_TIMEZONE" = "true" ]; then
-	setup-timezone -z ${CONTAINER_TIMEZONE} && \
+	unlink /etc/localtime
+	ln -s /usr/share/zoneinfo/${CONTAINER_TIMEZONE} /etc/localtime && \
 	echo "Container timezone set to: $CONTAINER_TIMEZONE"
 else
 	echo "Container timezone not modified"
 fi
 
-# Force immediate synchronisation of the time and start the time-synchronization service.
-# In order to be able to use ntpd in the container, it must be run with the SYS_TIME capability.
-# In addition you may want to add the SYS_NICE capability, in order for ntpd to be able to modify its priority.
-ntpd -s
+if [[ -n "${ELASTICSEARCH_USERNAME:-}" ]]
+then
+	flags="--user ${ELASTICSEARCH_USERNAME}:${ELASTICSEARCH_PASSWORD}"
+else
+	flags=""
+fi
 
-# Check if the Elastalert index exists in Elasticsearch and create it if it does not.
-
-if curl -f ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT} > /dev/null 2>&1; then
-  if ! curl -f ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/${ELASTICSEARCH_INDEX} > /dev/null 2>&1; then
-    echo "Creating Elastalert index in Elasticsearch..."
-    elastalert-create-index --index ${ELASTICSEARCH_INDEX} --old-index ""
-  else
-    echo "Elastalert index already exists in Elasticsearch."
- fi
+if ! curl -f $flags ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT} >/dev/null 2>&1
+then
+	echo "Elasticsearch not available at ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}"
+else
+	if ! curl -f $flags ${ELASTICSEARCH_HOST}:${ELASTICSEARCH_PORT}/elastalert_status >/dev/null 2>&1
+	then
+		echo "Creating Elastalert index in Elasticsearch..."
+	    elastalert-create-index --index elastalert_status --old-index ""
+	else
+	    echo "Elastalert index already exists in Elasticsearch."
+	fi
 fi
 
 exec "$@"
