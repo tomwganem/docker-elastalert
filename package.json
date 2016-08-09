@@ -1,0 +1,9 @@
+{
+  "repository": {
+    "git": "git@gitlab.aspera.us:devops/docker-elastalert.git"
+  },
+  "private": true,
+  "devDependencies": {
+    "aspera-docker-build": "^1.0.0"
+  }
+}
